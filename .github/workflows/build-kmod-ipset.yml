@@ -1,0 +1,55 @@
+name: build-kmod-ipt-ipset
+
+on:
+  workflow_dispatch:
+    inputs:
+      rev:
+        description: "固件版本里的提交号（r38511-a99b0888b8 → 填 a99b0888b8）"
+        required: true
+        default: "a99b0888b8"
+      branch:
+        description: "ImmortalWrt 源码分支"
+        required: true
+        default: "openwrt-25.12"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 释放磁盘空间（OpenWrt 全量构建需要 ~20GB）
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost \
+                      /usr/local/lib/node_modules
+          sudo apt-get clean
+          df -h /
+
+      - name: 编译 kmod-ipt-ipset
+        env:
+          REV: ${{ inputs.rev }}
+          BRANCH: ${{ inputs.branch }}
+          SRC: ${{ github.workspace }}/src
+          JOBS: 4
+        run: bash build-kmod-ipt-ipset.sh
+
+      - name: 打印产物信息
+        if: always()
+        run: |
+          ls -l src/out-kmod-ipset || true
+          cat src/out-kmod-ipset/SHA256SUMS || true
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: kmod-ipt-ipset-6.12.112-aarch64
+          path: src/out-kmod-ipset/
+          if-no-files-found: error
+          retention-days: 30
