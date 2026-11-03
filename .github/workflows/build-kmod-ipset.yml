@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       rev:
-        description: "固件版本里的提交号（r38511-a99b0888b8 → 填 a99b0888b8）"
-        required: true
-        default: "a99b0888b8"
+        description: "可选：指定提交号；留空则用分支最新提交（当前内核 6.12.112）"
+        required: false
+        default: ""
       branch:
         description: "ImmortalWrt 源码分支"
         required: true
