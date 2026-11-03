@@ -1,5 +1,6 @@
 name: build-kmod-ipt-ipset
 
+# 在 GitHub 网页上手动触发：Actions -> build-kmod-ipt-ipset -> Run workflow
 on:
   workflow_dispatch:
     inputs:
@@ -17,6 +18,7 @@ permissions:
 
 jobs:
   build:
+    # 25.12 需要较新的编译环境，用 24.04
     runs-on: ubuntu-24.04
     timeout-minutes: 300
 
@@ -32,6 +34,19 @@ jobs:
           sudo apt-get clean
           df -h /
 
+      # 工具链要编 20~30 分钟，缓存下来重跑时直接跳过
+      - name: 恢复工具链缓存
+        id: cache-toolchain
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            src/staging_dir
+            src/build_dir/host
+            src/build_dir/toolchain-*
+          key: owrt-${{ inputs.branch }}-toolchain-v1
+          restore-keys: |
+            owrt-${{ inputs.branch }}-toolchain-
+
       - name: 编译 kmod-ipt-ipset
         env:
           REV: ${{ inputs.rev }}
@@ -40,6 +55,17 @@ jobs:
           JOBS: 4
         run: bash build-kmod-ipt-ipset.sh
 
+      # 只在工具链确实编成功时才存缓存，避免把半成品存进去
+      - name: 保存工具链缓存
+        if: always() && steps.cache-toolchain.outputs.cache-hit != 'true' && hashFiles('src/.toolchain-ok') != ''
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.cache-toolchain.outputs.cache-primary-key }}
+          path: |
+            src/staging_dir
+            src/build_dir/host
+            src/build_dir/toolchain-*
+
       - name: 打印产物信息
         if: always()
         run: |
@@ -47,9 +73,10 @@ jobs:
           cat src/out-kmod-ipset/SHA256SUMS || true
 
       - name: 上传产物
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: kmod-ipt-ipset-6.12.112-aarch64
           path: src/out-kmod-ipset/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
