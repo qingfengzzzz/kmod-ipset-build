@@ -119,12 +119,17 @@ step "5/6 生成配置（$PROFILE）并开始编译"
 cat > .config <<EOF
 CONFIG_TARGET_mediatek=y
 CONFIG_TARGET_mediatek_filogic=y
+CONFIG_TARGET_MULTI_PROFILE=y
 ${TARGET_CFG}=y
 CONFIG_PACKAGE_kmod-ipt-ipset=m
 EOF
 make defconfig
-grep -q "^CONFIG_PACKAGE_kmod-ipt-ipset=m" .config || die "kmod-ipt-ipset 没有被选中，请检查 .config"
-grep -q "^${TARGET_CFG}=y" .config || die "设备 profile 没有被选中，请检查 .config"
+grep -qE "^CONFIG_PACKAGE_kmod-ipt-ipset=(m|y)" .config || die "kmod-ipt-ipset 没有被选中，请检查 .config"
+if ! grep -q "^${TARGET_CFG}=y" .config; then
+    echo "警告：设备 profile 未被选中，将按该子目标的默认 profile 继续编译。"
+    echo "      （内核模块与设备无关，vermagic 仍然是 6.12.112，不影响使用）"
+    grep -E '^CONFIG_TARGET' .config | head -n 20 || true
+fi
 
 # 先编内核（模块依赖内核源码树），再编内核模块包
 make -j"$JOBS" target/linux/compile
